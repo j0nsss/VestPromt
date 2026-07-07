@@ -18,44 +18,71 @@ let inputRow = 0
 let inputCol = 0
 let logoLines = []
 
+const esc = (s) => '\x1b[' + s
+
+function hideCursor() { stdout.write(esc('?25l')) }
+function showCursor() { stdout.write(esc('?25h')) }
+function disableWrap() { stdout.write(esc('?7l')) }
+function enableWrap() { stdout.write(esc('?7h')) }
+
 function termW() {
   return stdout.columns || 80
 }
 
-function center(s) {
+function center(text) {
   const w = termW()
-  const l = Math.max(0, Math.floor((w - s.length) / 2))
-  return ' '.repeat(l) + s
+  const pad = Math.max(0, Math.floor((w - text.length) / 2))
+  return ' '.repeat(pad) + text
+}
+
+function rightAlign(text) {
+  const w = termW()
+  return ' '.repeat(Math.max(0, w - text.length)) + text
 }
 
 function buildLayout(buffer) {
-  const w = termW()
-  boxW = Math.min(70, Math.floor(w * 0.72))
-  boxX = Math.floor((w - boxW) / 2)
-  const p = ' '.repeat(boxX)
-  const horiz = '\u2500'.repeat(boxW - 2)
+  const width = termW()
 
-  const topB = p + dim('\u250c' + horiz + '\u2510')
-  const botB = p + dim('\u2514' + horiz + '\u2518')
-  const indicator = blueBg + ' ' + rst
+  const boxWidth = Math.min(80, Math.max(30, width - 10))
+  const boxPad = Math.max(0, Math.floor((width - boxWidth) / 2))
+  const p = ' '.repeat(boxPad)
+
+  boxW = boxWidth
+  boxX = boxPad
+
+  const hz = '\u2500'.repeat(boxWidth - 2)
+  const topB = p + dim('\u250c' + hz + '\u2510')
+  const botB = p + dim('\u2514' + hz + '\u2518')
   const pipe = dim('\u2502')
 
-  const visible = buffer.slice(-(boxW - 4))
-  const padLen = Math.max(0, boxW - 4 - visible.length)
-  const inputLine = pipe + indicator + visible + ' '.repeat(padLen) + pipe
-  const empty = pipe + ' '.repeat(boxW - 2) + pipe
+  const ind = blueBg + ' ' + rst
+  const inside = boxWidth - 2
 
-  const statusT = dim('Build \u00b7 Gemini 2.5 Flash \u00b7 Free Tier ') + orange + 'high' + rst
-  const statusLine = pipe + ' '.repeat(boxW - 4 - 35) + statusT + pipe
+  const maxInput = boxWidth - 4
+  const visible = buffer.length > maxInput
+    ? buffer.slice(-maxInput)
+    : buffer
+  const padLen = Math.max(0, maxInput - visible.length)
+  const inputLine = pipe + ind + visible + ' '.repeat(padLen) + pipe
+
+  const empty = pipe + ' '.repeat(inside) + pipe
+
+  const sText = 'Build \u00b7 Gemini 2.5 Flash \u00b7 Free Tier'
+  const sHigh = 'high'
+  const sDisplayLen = sText.length + 1 + sHigh.length
+  const sPad = Math.max(0, inside - 2 - sDisplayLen)
+  const statusLine = pipe + ' '.repeat(sPad) + dim(sText + ' ') + orange + sHigh + rst + pipe
 
   const lines = ['']
 
-  if (logoLines.length > 0) {
+  const logoW = 63
+  const showFullLogo = logoLines.length > 0 && width >= logoW
+  if (showFullLogo) {
     for (const l of logoLines) {
       lines.push(center(dim(l)))
     }
-  } else {
-    lines.push(center(bold(blue('vestprompt'))))
+  } else if (logoLines.length > 0) {
+    lines.push(center(bold(dim('vestprompt'))))
   }
   lines.push('')
 
@@ -70,8 +97,7 @@ function buildLayout(buffer) {
     dim('tab agents') + dim('   ctrl+p commands') +
     dim('   ') + bold(blue('esc submit')) +
     dim('   ctrl+c exit')
-  const sw = termW() - 2
-  lines.push(' '.repeat(Math.max(0, sw - 30)) + shortcut)
+  lines.push(rightAlign(shortcut))
   lines.push('')
 
   const tip = orange + '\u25cf' + rst + '  ' + dim('Tip  ') +
@@ -81,26 +107,34 @@ function buildLayout(buffer) {
   lines.push('')
   lines.push(dim('~'))
 
-  inputRow = 2 + (logoLines.length > 0 ? logoLines.length : 0)
-  inputCol = boxX + 3
+  const logoH = showFullLogo ? logoLines.length : 1
+  inputRow = 1 + logoH + 1
+  inputCol = boxPad + 3
 
   return lines
 }
 
 function render(buffer) {
+  hideCursor()
+  disableWrap()
+
   const lines = buildLayout(buffer)
-  const output = lines.join('\n')
-  stdout.write('\x1b[0;0H' + output)
+  stdout.write('\x1b[H' + lines.join('\n'))
 
   const curRow = inputRow + 1
-  const curCol = inputCol + buffer.slice(-(boxW - 4)).length
-  stdout.write('\x1b[' + curRow + ';' + curCol + 'H')
+  const maxInput = boxW - 4
+  const visible = buffer.length > maxInput ? buffer.slice(-maxInput) : buffer
+  const curCol = inputCol + visible.length
+  stdout.write(esc(curRow + ';' + curCol + 'H'))
+
+  enableWrap()
+  showCursor()
 }
 
 export function showTUI() {
   try {
     const raw = figlet.textSync('VESTPROMPT', { font: 'Standard' })
-    logoLines = raw.split('\n')
+    logoLines = raw.replace(/\n$/, '').split('\n')
   } catch {
     logoLines = []
   }
@@ -111,7 +145,7 @@ export function showTUI() {
 export function collectInput() {
   return new Promise((resolve) => {
     inputBuffer = ''
-    stdout.write('\x1b[2J')
+    stdout.write('\x1b[2J\x1b[H')
     render('')
 
     emitKeypressEvents(process.stdin)
@@ -121,6 +155,8 @@ export function collectInput() {
       try { process.stdin.setRawMode(false) } catch {}
       process.stdin.removeListener('keypress', onKeypress)
       process.stdout.removeListener('resize', onResize)
+      enableWrap()
+      showCursor()
     }
 
     function onResize() {
@@ -145,14 +181,18 @@ export function collectInput() {
       }
 
       if (key.name === 'backspace') {
-        inputBuffer = inputBuffer.slice(0, -1)
-        render(inputBuffer)
+        if (inputBuffer.length > 0) {
+          inputBuffer = inputBuffer.slice(0, -1)
+          render(inputBuffer)
+        }
         return
       }
 
       if (key.name === 'delete') {
-        inputBuffer = inputBuffer.slice(1)
-        render(inputBuffer)
+        if (inputBuffer.length > 0) {
+          inputBuffer = inputBuffer.slice(1)
+          render(inputBuffer)
+        }
         return
       }
 
