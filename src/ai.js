@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const MODEL_NAME = 'gemini-2.0-flash-thinking-exp'
+const MODEL_NAME = 'gemini-2.0-flash'
 
 const SYSTEM_INSTRUCTION = `You are a senior prompt engineer. Your role is to deeply analyze the user's raw, unstructured prompt idea, understand the true intent behind it, and rewrite it into a professional, well-structured, and immediately usable prompt.
 
