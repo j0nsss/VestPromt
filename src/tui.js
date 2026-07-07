@@ -114,21 +114,28 @@ function buildLayout(buffer) {
   return lines
 }
 
+let resizeTimer = null
+
+function clearScreen() {
+  stdout.write('\x1b[2J\x1b[3J\x1b[H')
+}
+
 function render(buffer) {
   hideCursor()
   disableWrap()
+  clearScreen()
 
   const lines = buildLayout(buffer)
-  stdout.write('\x1b[H' + lines.join('\n'))
+  stdout.write(lines.join('\n'))
 
   const curRow = inputRow + 1
   const maxInput = boxW - 4
   const visible = buffer.length > maxInput ? buffer.slice(-maxInput) : buffer
   const curCol = inputCol + visible.length
-  stdout.write(esc(curRow + ';' + curCol + 'H'))
 
-  enableWrap()
+  stdout.write('\x1b[' + curRow + ';' + curCol + 'H')
   showCursor()
+  enableWrap()
 }
 
 export function showTUI() {
@@ -153,14 +160,17 @@ export function collectInput() {
 
     function cleanup() {
       try { process.stdin.setRawMode(false) } catch {}
+      if (resizeTimer) { clearTimeout(resizeTimer); resizeTimer = null }
       process.stdin.removeListener('keypress', onKeypress)
       process.stdout.removeListener('resize', onResize)
-      enableWrap()
-      showCursor()
     }
 
     function onResize() {
-      render(inputBuffer)
+      if (resizeTimer) clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => {
+        render(inputBuffer)
+        resizeTimer = null
+      }, 80)
     }
     process.stdout.on('resize', onResize)
 
