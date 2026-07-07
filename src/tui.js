@@ -5,6 +5,8 @@ import { emitKeypressEvents } from 'node:readline'
 const dim = pc.dim
 const bold = pc.bold
 const blue = pc.blue
+const green = pc.green
+const red = pc.red
 const { stdout } = process
 
 const orange = '\x1b[38;5;173m'
@@ -210,6 +212,19 @@ export function collectInput() {
   })
 }
 
+function renderLogo() {
+  if (logoLines.length === 0) return
+  const w = termW()
+  if (w >= 63) {
+    for (const l of logoLines) {
+      console.log(center(dim(l)))
+    }
+  } else {
+    console.log(center(bold(dim('vestprompt'))))
+  }
+  console.log()
+}
+
 export async function showProcessing() {
   console.log()
   const { default: ora } = await import('ora')
@@ -226,22 +241,53 @@ function stripMarkdown(text) {
 }
 
 export function displayResult(text) {
+  const w = termW()
+  const sep = dim('\u2500'.repeat(Math.min(w, 80)))
+
+  stdout.write('\x1b[2J\x1b[H')
+
+  renderLogo()
+
+  console.log(center(sep))
   console.log()
-  console.log('  ' + stripMarkdown(text))
+  console.log(center(green(bold('\u2728 OPTIMIZED PROMPT READY TO COPY:'))))
+  console.log()
+
+  const cleaned = stripMarkdown(text)
+  for (const line of cleaned.split('\n')) {
+    console.log('  ' + line)
+  }
+
+  console.log()
+  console.log(center(sep))
   console.log()
 }
 
 export function displayError(title, message, stack) {
+  const w = termW()
+  const sep = dim('\u2500'.repeat(Math.min(w, 80)))
+
+  stdout.write('\x1b[2J\x1b[H')
+
+  renderLogo()
+
+  console.log(center(sep))
   console.log()
-  console.log('  ' + title)
+  console.log(center(red(bold('\u2716 ' + title))))
+  console.log()
+
   for (const line of message.split('\n')) {
     console.log('  ' + line)
   }
+
   if (stack) {
     console.log()
     for (const line of stack.split('\n').slice(0, 6)) {
       console.log('  ' + line)
     }
   }
+
+  console.log()
+  console.log(center(sep))
   console.log()
 }

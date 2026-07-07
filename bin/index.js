@@ -28,7 +28,6 @@ async function main() {
     const optimized = await optimizePrompt(rawInput)
 
     spinner.stop()
-    console.log()
     displayResult(optimized)
   } catch (err) {
     spinner.stop()
