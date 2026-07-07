@@ -18,12 +18,10 @@ let inputRow = 0
 let inputCol = 0
 let logoLines = []
 
-const esc = (s) => '\x1b[' + s
-
-function hideCursor() { stdout.write(esc('?25l')) }
-function showCursor() { stdout.write(esc('?25h')) }
-function disableWrap() { stdout.write(esc('?7l')) }
-function enableWrap() { stdout.write(esc('?7h')) }
+function hideCursor() { stdout.write('\x1b[?25l') }
+function showCursor() { stdout.write('\x1b[?25h') }
+function disableWrap() { stdout.write('\x1b[?7l') }
+function enableWrap() { stdout.write('\x1b[?7h') }
 
 function termW() {
   return stdout.columns || 80
@@ -33,11 +31,6 @@ function center(text) {
   const w = termW()
   const pad = Math.max(0, Math.floor((w - text.length) / 2))
   return ' '.repeat(pad) + text
-}
-
-function rightAlign(text) {
-  const w = termW()
-  return ' '.repeat(Math.max(0, w - text.length)) + text
 }
 
 function buildLayout(buffer) {
@@ -63,15 +56,15 @@ function buildLayout(buffer) {
     ? buffer.slice(-maxInput)
     : buffer
   const padLen = Math.max(0, maxInput - visible.length)
-  const inputLine = pipe + ind + visible + ' '.repeat(padLen) + pipe
+  const inputLine = p + pipe + ind + visible + ' '.repeat(padLen) + pipe
 
-  const empty = pipe + ' '.repeat(inside) + pipe
+  const empty = p + pipe + ' '.repeat(inside) + pipe
 
   const sText = 'Build \u00b7 Gemini 2.5 Flash \u00b7 Free Tier'
   const sHigh = 'high'
   const sDisplayLen = sText.length + 1 + sHigh.length
   const sPad = Math.max(0, inside - 2 - sDisplayLen)
-  const statusLine = pipe + ' '.repeat(sPad) + dim(sText + ' ') + orange + sHigh + rst + pipe
+  const statusLine = p + pipe + ' '.repeat(sPad) + dim(sText + ' ') + orange + sHigh + rst + pipe
 
   const lines = ['']
 
@@ -93,11 +86,12 @@ function buildLayout(buffer) {
   lines.push(botB)
   lines.push('')
 
-  const shortcut =
-    dim('tab agents') + dim('   ctrl+p commands') +
-    dim('   ') + bold(blue('esc submit')) +
-    dim('   ctrl+c exit')
-  lines.push(rightAlign(shortcut))
+  const leftCmd = dim('esc submit   ctrl+c exit')
+  const rightNav = dim('tab agents   ctrl+p commands')
+  const leftX = boxPad + 1
+  const rightX = boxPad + boxWidth - 2 - rightNav.length
+  const padBetween = Math.max(0, rightX - leftX - leftCmd.length)
+  lines.push(' '.repeat(leftX) + leftCmd + ' '.repeat(padBetween) + rightNav)
   lines.push('')
 
   const tip = orange + '\u25cf' + rst + '  ' + dim('Tip  ') +
@@ -109,7 +103,7 @@ function buildLayout(buffer) {
 
   const logoH = showFullLogo ? logoLines.length : 1
   inputRow = 1 + logoH + 1
-  inputCol = boxPad + 3
+  inputCol = boxPad + 2
 
   return lines
 }
@@ -131,7 +125,7 @@ function render(buffer) {
   const curRow = inputRow + 1
   const maxInput = boxW - 4
   const visible = buffer.length > maxInput ? buffer.slice(-maxInput) : buffer
-  const curCol = inputCol + visible.length
+  const curCol = inputCol + 1 + visible.length
 
   stdout.write('\x1b[' + curRow + ';' + curCol + 'H')
   showCursor()
