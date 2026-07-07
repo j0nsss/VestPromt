@@ -14,12 +14,16 @@ export function showHeader() {
   console.log()
 }
 
+function stripMarkdown(text) {
+  return text.replace(/\*\*/g, '')
+}
+
 export function showResult(optimized) {
   console.log(`  ${green(bold('┃'))} ${green(bold('Optimized Prompt'))}`)
   console.log()
   const lines = optimized.split('\n')
   for (const line of lines) {
-    console.log(`  ${dim('│')}  ${line}`)
+    console.log(`  ${dim('│')}  ${stripMarkdown(line)}`)
   }
   console.log()
   console.log(`  ${dim('└' + '─'.repeat(28))}${dim('·')}${dim('─'.repeat(28))}${' '}`)
