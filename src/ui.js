@@ -29,7 +29,7 @@ function renderLogo() {
     console.log(center(dim('Creator: Jonad  \u00b7  GitHub: J0nsss  \u00b7  Version: 0.1.0')))
   } else if (logoLines.length > 0) {
     console.log(center(red(bold('vestprompt'))))
-    console.log(center(dim('Creator: Jonad  \u00b7  GitHub: J0nsss  \u00b7  Version: 0.1.0')))
+    console.log(center(dim('Creator: Jonad  \u00b7  GitHub: @J0nsss  \u00b7  Version: 0.1.0')))
   }
   console.log()
 }
