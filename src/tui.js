@@ -1,167 +1,110 @@
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
-const blessed = require('blessed')
+import pc from 'picocolors'
+import { createInterface } from 'node:readline'
 
-const C = {
-  bg: '#0d0d0d',
-  surface: '#1e1e1e',
-  border: '#3c3c3c',
-  blueAccent: '#3b8eff',
-  text: '#e0e0e0',
-  dim: '#6c6c6c',
-  orange: '#cc7832',
-  green: '#6aab73',
-  red: '#f44747',
-  white: '#d4d4d4',
+const dim = pc.dim
+const bold = pc.bold
+const blue = pc.blue
+
+let linesTyped = []
+let inputY = 0
+let boxX = 0
+
+function termWidth() {
+  return process.stdout.columns || 80
 }
 
-export function startTUI() {
-  const screen = blessed.screen({
-    smartCSR: true,
-    title: 'vestprompt',
-    cursor: {
-      artificial: true,
-      shape: 'line',
-      blink: true,
-      color: 'white',
-    },
-    terminal: 'xterm-256color',
-    fullUnicode: true,
-  })
-  screen.program.hideCursor()
+function center(text) {
+  const w = termWidth()
+  const l = Math.max(0, Math.floor((w - text.length) / 2))
+  return ' '.repeat(l) + text
+}
 
-  const header = blessed.text({
-    parent: screen,
-    top: 2,
-    left: 'center',
-    content: '{bold}vestprompt{/bold}',
-    style: { fg: C.white, bold: true },
-    tags: true,
-  })
+export function showTUI() {
+  console.clear()
 
-  const inputBox = blessed.box({
-    parent: screen,
-    top: 'center',
-    left: 'center',
-    width: '72%',
-    height: 7,
-    style: { bg: C.surface },
-    border: { type: 'line', fg: C.border },
-  })
+  const w = termWidth()
+  const boxW = Math.min(70, Math.floor(w * 0.72))
+  boxX = Math.floor((w - boxW) / 2)
+  const p = ' '.repeat(boxX)
 
-  const indicator = blessed.text({
-    parent: inputBox,
-    left: 1,
-    top: 1,
-    width: 1,
-    height: 4,
-    content: ' ',
-    style: { bg: C.blueAccent },
-  })
+  console.log()
+  console.log(center(blue(bold('vestprompt'))))
+  console.log()
 
-  const textarea = blessed.textarea({
-    parent: inputBox,
-    top: 1,
-    left: 3,
-    right: 1,
-    height: 4,
-    input: true,
-    keys: true,
-    mouse: true,
-    style: {
-      fg: C.text,
-      bg: C.surface,
-      focus: { fg: C.text, bg: C.surface },
-    },
-    placeholder: 'Ask anything... "Fix broken tests"',
-  })
+  console.log(p + dim('\u250c' + '\u2500'.repeat(boxW - 2) + '\u2510'))
 
-  const statusBar = blessed.text({
-    parent: inputBox,
-    bottom: 0,
-    left: 2,
-    right: 1,
-    height: 1,
-    content: 'Build  {dim}·{/dim}  Gemini 2.5 Flash  {dim}·{/dim}  Free Tier  {#cc7832-fg}high{/#cc7832-fg}',
-    style: { fg: C.dim, bg: C.surface },
-    tags: true,
-  })
+  const indicator = '\x1b[48;5;33m \x1b[0m'
+  console.log(p + dim('\u2502') + indicator + ' '.repeat(boxW - 4) + dim('\u2502'))
 
-  const shortcutHelp = blessed.text({
-    parent: screen,
-    bottom: 5,
-    right: '14%',
-    content: '{dim}tab agents{/dim}   {dim}ctrl+p commands{/dim}   {#3b8eff-fg}esc submit{/#3b8eff-fg}   {dim}ctrl+c exit{/dim}',
-    style: { fg: C.dim },
-    tags: true,
-  })
+  for (let i = 0; i < 2; i++) {
+    console.log(p + dim('\u2502') + ' '.repeat(boxW - 2) + dim('\u2502'))
+  }
 
-  const tip = blessed.text({
-    parent: screen,
-    bottom: 3,
-    left: 'center',
-    content: `{#cc7832-fg}●{/#cc7832-fg}  {dim}Tip{/dim}  Run {bold}vestprompt upgrade{/bold} to update to the latest version`,
-    style: { fg: C.dim },
-    tags: true,
-  })
+  const orange = '\x1b[38;5;173m'
+  const reset = '\x1b[0m'
+  const statusLine = dim('Build ') + dim('\u00b7') + dim('  Gemini 2.5 Flash ') + dim('\u00b7') + dim('  Free Tier  ') + orange + 'high' + reset
+  const statusPad = ' '.repeat(Math.max(0, boxW - 4 - statusLine.length + 10))
+  console.log(p + dim('\u2502') + statusPad + statusLine + dim('\u2502'))
 
-  const footerLeft = blessed.text({
-    parent: screen,
-    bottom: 0,
-    left: 0,
-    content: '~',
-    style: { fg: C.dim },
-  })
+  console.log(p + dim('\u2514' + '\u2500'.repeat(boxW - 2) + '\u2518'))
 
-  const footerRight = blessed.text({
-    parent: screen,
-    bottom: 0,
-    right: 0,
-    content: '{dim}0.1.0{/dim}',
-    style: { fg: C.dim },
-    tags: true,
-  })
+  const shortcut = dim('tab agents') + dim('   ctrl+p commands') + dim('   ') + bold(blue('enter submit')) + dim('   ctrl+c exit')
+  const shortcutX = Math.max(0, w - shortcut.length + 10)
+  console.log()
+  console.log(' '.repeat(Math.max(0, shortcutX)) + shortcut)
+  console.log()
 
-  textarea.focus()
-  screen.render()
+  const tip = orange + '\u25cf' + reset + '  ' + dim('Tip  ') + 'Run ' + bold('vestprompt upgrade') + ' to update to the latest version'
+  console.log(center(tip))
+  console.log()
 
+  console.log()
+  console.log(dim('~'))
+
+  const rows = process.stdout.rows || 24
+  process.stdout.write('\x1b[' + rows + ';' + (w - 5) + 'H' + dim('0.1.0'))
+  process.stdout.write('\x1b[' + 5 + ';' + (boxX + 4) + 'H')
+
+  inputY = 5
+}
+
+export function collectInput() {
   return new Promise((resolve) => {
-    screen.key(['escape'], () => {
-      const val = textarea.getValue().trim()
-      if (!val) return
-      destroyTUI(screen)
-      resolve(val)
+    linesTyped = []
+
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      terminal: true,
     })
 
-    screen.key(['C-c'], () => {
-      destroyTUI(screen)
+    rl.on('SIGINT', () => {
+      rl.close()
       process.exit(0)
     })
 
-    screen.on('resize', () => {
-      header.left = 'center'
-      inputBox.left = 'center'
-      shortcutHelp.right = '14%'
-      tip.left = 'center'
-      screen.render()
+    rl.on('line', (line) => {
+      if (line.trim() === '' && linesTyped.length > 0) {
+        rl.close()
+        return
+      }
+      linesTyped.push(line)
     })
 
-    textarea.on('keypress', () => {
-      screen.render()
+    rl.on('close', () => {
+      resolve(linesTyped.join('\n').trim())
     })
+
+    const writePos = '\x1b[' + inputY + ';' + (boxX + 4) + 'H'
+    process.stdout.write(writePos)
   })
-}
-
-export function destroyTUI(screen) {
-  screen.program.showCursor()
-  screen.destroy()
 }
 
 export async function showProcessing() {
   console.log()
   const { default: ora } = await import('ora')
   const spinner = ora({
-    text: 'Analyzing intent & optimizing structure...',
+    text: dim('Analyzing intent & optimizing structure...'),
     spinner: 'dots',
     color: 'cyan',
   }).start()
@@ -173,25 +116,21 @@ function stripMarkdown(text) {
 }
 
 export function displayResult(text) {
-  const lines = text.split('\n')
   console.log()
-  for (const line of lines) {
-    console.log(`  ${stripMarkdown(line)}`)
-  }
+  console.log('  ' + stripMarkdown(text))
   console.log()
 }
 
 export function displayError(title, message, stack) {
   console.log()
-  console.log(`  ${title}`)
+  console.log('  ' + title)
   for (const line of message.split('\n')) {
-    console.log(`  ${line}`)
+    console.log('  ' + line)
   }
   if (stack) {
     console.log()
-    const stackLines = stack.split('\n').slice(0, 6)
-    for (const line of stackLines) {
-      console.log(`  ${line}`)
+    for (const line of stack.split('\n').slice(0, 6)) {
+      console.log('  ' + line)
     }
   }
   console.log()

@@ -2,7 +2,7 @@
 
 import { loadEnv } from '../src/config.js'
 import { initAI, optimizePrompt } from '../src/ai.js'
-import { startTUI, showProcessing, displayResult, displayError } from '../src/tui.js'
+import { showTUI, collectInput, showProcessing, displayResult, displayError } from '../src/tui.js'
 
 async function main() {
   let env
@@ -13,14 +13,15 @@ async function main() {
     process.exit(1)
   }
 
-  const rawInput = await startTUI()
+  showTUI()
+  const rawInput = await collectInput()
 
   if (!rawInput) {
     displayError('Empty Input', 'No prompt was provided. Please try again.')
     process.exit(1)
   }
 
-  const spinner = showProcessing()
+  const spinner = await showProcessing()
 
   try {
     initAI(env.GEMINI_API_KEY)
