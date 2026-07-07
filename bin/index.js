@@ -2,10 +2,11 @@
 
 import { loadEnv } from '../src/config.js'
 import { initAI, optimizePrompt } from '../src/ai.js'
-import { showHeader, showSeparator, showResult, showError, collectMultilineInput } from '../src/ui.js'
+import { showHeader, showResult, showError, collectMultilineInput } from '../src/ui.js'
+import pc from 'picocolors'
 
 process.on('SIGINT', () => {
-  console.log('\n')
+  console.log()
   process.exit(0)
 })
 
@@ -26,9 +27,11 @@ async function main() {
     process.exit(1)
   }
 
+  console.log()
   const { default: ora } = await import('ora')
   const spinner = ora({
-    text: 'Analyzing & optimizing your prompt...',
+    text: pc.dim('Analyzing intent & optimizing structure...'),
+    spinner: 'dots',
     color: 'cyan',
   }).start()
 
@@ -37,9 +40,8 @@ async function main() {
     const optimized = await optimizePrompt(rawInput)
 
     spinner.stop()
-    showSeparator()
+    console.log()
     showResult(optimized)
-    showSeparator()
   } catch (err) {
     spinner.stop()
     showError('Optimization Failed', err.message, err.stack)

@@ -1,38 +1,48 @@
 import pc from 'picocolors'
 import { createInterface } from 'node:readline'
 
-const SEPARATOR = pc.dim('─'.repeat(process.stdout.columns || 60))
+const dim = pc.dim
+const cyan = pc.cyan
+const green = pc.green
+const red = pc.red
+const bold = pc.bold
+const yellow = pc.yellow
 
 export function showHeader() {
   console.log()
-  console.log(pc.cyan(pc.bold('vestprompt')) + pc.dim(' v0.1.0'))
-  console.log(pc.dim('AI Prompt Optimizer — type rough, get sharp.'))
-  console.log(SEPARATOR)
+  console.log(`  ${cyan(bold('◆'))}  ${bold('vestprompt')} ${dim('v0.1.0')}`)
   console.log()
 }
 
-export function showSeparator() {
+export function showResult(optimized) {
+  console.log(`  ${green(bold('┃'))} ${green(bold('Optimized Prompt'))}`)
   console.log()
-  console.log(SEPARATOR)
+  const lines = optimized.split('\n')
+  for (const line of lines) {
+    console.log(`  ${dim('│')}  ${line}`)
+  }
   console.log()
-}
-
-export function showResult(text) {
-  console.log(pc.green(pc.bold('✓ Optimized Prompt')))
-  console.log()
-  console.log(pc.white(text))
+  console.log(`  ${dim('└' + '─'.repeat(28))}${dim('·')}${dim('─'.repeat(28))}${' '}`)
   console.log()
 }
 
 export function showError(title, message, stack) {
-  console.error(pc.red(pc.bold(`✗ ${title}`)))
-  console.error()
-  console.error(pc.red(message))
-  if (stack) {
-    console.error()
-    console.error(pc.dim(stack))
+  console.log()
+  console.log(`  ${red(bold('┃'))} ${red(bold(title))}`)
+  console.log()
+  for (const line of message.split('\n')) {
+    console.log(`  ${dim('│')}  ${red(line)}`)
   }
-  console.error()
+  if (stack) {
+    console.log()
+    const stackLines = stack.split('\n').slice(0, 6)
+    for (const line of stackLines) {
+      console.log(`  ${dim('│')}  ${dim(line)}`)
+    }
+  }
+  console.log()
+  console.log(`  ${dim('└' + '─'.repeat(28))}${dim('·')}${dim('─'.repeat(28))}${' '}`)
+  console.log()
 }
 
 export function collectMultilineInput() {
@@ -43,8 +53,8 @@ export function collectMultilineInput() {
     })
 
     const lines = []
-    console.log(pc.cyan('Enter your raw prompt'))
-    console.log(pc.dim('(Press Ctrl+D or Enter on empty line when done)'))
+    console.log(`  ${cyan(bold('?'))} ${bold('Enter your raw prompt')}`)
+    console.log(`  ${dim('  (Ctrl+D or blank line to submit)')}`)
     console.log()
 
     rl.on('line', (line) => {
