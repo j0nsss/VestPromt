@@ -19,33 +19,29 @@ function stripMarkdown(text) {
 }
 
 export function showResult(optimized) {
-  console.log(`  ${green(bold('┃'))} ${green(bold('Optimized Prompt'))}`)
+  console.log(`  ${green(bold('Optimized Prompt'))}`)
   console.log()
   const lines = optimized.split('\n')
   for (const line of lines) {
-    console.log(`  ${dim('│')}  ${stripMarkdown(line)}`)
+    console.log(`  ${stripMarkdown(line)}`)
   }
-  console.log()
-  console.log(`  ${dim('└' + '─'.repeat(28))}${dim('·')}${dim('─'.repeat(28))}${' '}`)
   console.log()
 }
 
 export function showError(title, message, stack) {
   console.log()
-  console.log(`  ${red(bold('┃'))} ${red(bold(title))}`)
+  console.log(`  ${red(bold(title))}`)
   console.log()
   for (const line of message.split('\n')) {
-    console.log(`  ${dim('│')}  ${red(line)}`)
+    console.log(`  ${red(line)}`)
   }
   if (stack) {
     console.log()
     const stackLines = stack.split('\n').slice(0, 6)
     for (const line of stackLines) {
-      console.log(`  ${dim('│')}  ${dim(line)}`)
+      console.log(`  ${dim(line)}`)
     }
   }
-  console.log()
-  console.log(`  ${dim('└' + '─'.repeat(28))}${dim('·')}${dim('─'.repeat(28))}${' '}`)
   console.log()
 }
 
@@ -57,8 +53,8 @@ export function collectMultilineInput() {
     })
 
     const lines = []
-    console.log(`  ${cyan(bold('?'))} ${bold('Enter your raw prompt')}`)
-    console.log(`  ${dim('  (Ctrl+D or blank line to submit)')}`)
+    console.log(`  ${bold('Enter your raw prompt')}`)
+    console.log(`  ${dim('(Ctrl+D or blank line to submit)')}`)
     console.log()
 
     rl.on('line', (line) => {
