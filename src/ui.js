@@ -22,11 +22,11 @@ function renderLogo() {
   if (logoLines.length === 0) return
   const w = termW()
   console.log()
-  if (w >= 63) {
+  if (w >= 87) {
     for (const l of logoLines) {
       console.log(center(dim(l)))
     }
-  } else {
+  } else if (logoLines.length > 0) {
     console.log(center(bold(dim('vestprompt'))))
   }
   console.log()
@@ -34,7 +34,7 @@ function renderLogo() {
 
 export function showTUI() {
   try {
-    const raw = figlet.textSync('VESTPROMPT', { font: 'Standard' })
+    const raw = figlet.textSync('VESTPROMPT', { font: 'ANSI Shadow' })
     logoLines = raw.replace(/\n$/, '').split('\n')
   } catch {
     logoLines = []
