@@ -2,7 +2,7 @@
 
 import { loadEnv } from '../src/config.js'
 import { initAI, optimizePrompt } from '../src/ai.js'
-import { showTUI, collectInput, showProcessing, displayResult, displayError } from '../src/tui.js'
+import { showTUI, collectInput, showProcessing, displayResult, displayError } from '../src/ui.js'
 
 async function main() {
   let env

@@ -1,72 +1,288 @@
 import pc from 'picocolors'
-import { createInterface } from 'node:readline'
+import figlet from 'figlet'
+import { emitKeypressEvents } from 'node:readline'
 
 const dim = pc.dim
-const cyan = pc.cyan
+const bold = pc.bold
+const blue = pc.blue
 const green = pc.green
 const red = pc.red
-const bold = pc.bold
-const yellow = pc.yellow
+const { stdout } = process
 
-export function showHeader() {
+const orange = '\x1b[38;5;173m'
+const rst = '\x1b[0m'
+const blueBg = '\x1b[48;5;33m'
+
+let inputBuffer = ''
+let logoLines = []
+let boxX = 0
+let boxW = 0
+let inputRow = 0
+let inputCol = 0
+let resizeTimer = null
+
+function termW() {
+  return stdout.columns || 80
+}
+
+function center(text) {
+  const w = termW()
+  const pad = Math.max(0, Math.floor((w - text.length) / 2))
+  return ' '.repeat(pad) + text
+}
+
+function hideCursor() { stdout.write('\x1b[?25l') }
+function showCursor() { stdout.write('\x1b[?25h') }
+function disableWrap() { stdout.write('\x1b[?7l') }
+function enableWrap() { stdout.write('\x1b[?7h') }
+
+function buildLayout(buffer) {
+  const width = termW()
+  const boxWidth = Math.min(100, Math.max(30, width - 12))
+  const boxPad = Math.max(0, Math.floor((width - boxWidth) / 2))
+  const p = ' '.repeat(boxPad)
+
+  boxW = boxWidth
+  boxX = boxPad
+
+  const hz = '\u2500'.repeat(boxWidth - 2)
+  const topB = p + dim('\u250c' + hz + '\u2510')
+  const botB = p + dim('\u2514' + hz + '\u2518')
+  const pipe = dim('\u2502')
+  const ind = blueBg + ' ' + rst
+  const inside = boxWidth - 2
+  const maxInput = boxWidth - 4
+
+  const showPlaceholder = buffer.length === 0
+  let inputContent
+  if (showPlaceholder) {
+    inputContent = dim('Ask anything... "Fix broken tests"'.padEnd(maxInput))
+  } else {
+    const visible = buffer.length > maxInput ? buffer.slice(-maxInput) : buffer
+    inputContent = visible + ' '.repeat(maxInput - visible.length)
+  }
+  const inputLine = p + pipe + ind + inputContent + pipe
+
+  const empty = p + pipe + ' '.repeat(inside) + pipe
+
+  const sText = 'Build \u00b7 Gemini 2.5 Flash \u00b7 Free Tier'
+  const sHigh = 'high'
+  const sDisplayLen = sText.length + 1 + sHigh.length
+  const sPad = Math.max(0, inside - 2 - sDisplayLen)
+  const statusLine = p + pipe + ' '.repeat(sPad) + dim(sText + ' ') + orange + sHigh + rst + pipe
+
+  const lines = ['']
+
+  const logoW = 63
+  const showFullLogo = logoLines.length > 0 && width >= logoW
+  if (showFullLogo) {
+    for (const l of logoLines) {
+      lines.push(center(dim(l)))
+    }
+  } else if (logoLines.length > 0) {
+    lines.push(center(bold(dim('vestprompt'))))
+  }
+  lines.push('')
+
+  lines.push(topB)
+  lines.push(inputLine)
+  for (let i = 0; i < 2; i++) lines.push(empty)
+  lines.push(statusLine)
+  lines.push(botB)
+  lines.push('')
+
+  const leftCmd = dim('esc submit   ctrl+c exit')
+  const rightNav = dim('tab agents   ctrl+p commands')
+  const leftX = boxPad + 1
+  const rightX = boxPad + boxWidth - 2 - rightNav.length
+  const padBetween = Math.max(0, rightX - leftX - leftCmd.length)
+  lines.push(' '.repeat(leftX) + leftCmd + ' '.repeat(padBetween) + rightNav)
+  lines.push('')
+
+  const tip = orange + '\u25cf' + rst + '  ' + dim('Tip  ') +
+    'Run ' + bold('vestprompt upgrade') + ' to update to the latest version'
+  lines.push(center(tip))
+  lines.push('')
+  lines.push('')
+  lines.push(dim('~'))
+
+  const logoH = showFullLogo ? logoLines.length : 1
+  inputRow = 1 + logoH + 1
+  inputCol = boxPad + 2
+
+  return lines
+}
+
+function render(buffer) {
+  hideCursor()
+  disableWrap()
+  stdout.write('\x1b[2J\x1b[3J\x1b[H')
+
+  const lines = buildLayout(buffer)
+  stdout.write(lines.join('\n'))
+
+  const curRow = inputRow + 1
+  const maxInput = boxW - 4
+  const displayText = buffer.length === 0 ? '' : buffer
+  const visible = displayText.length > maxInput ? displayText.slice(-maxInput) : displayText
+  const curCol = inputCol + 1 + visible.length
+  stdout.write('\x1b[' + curRow + ';' + curCol + 'H')
+
+  showCursor()
+  enableWrap()
+}
+
+function renderLogo() {
+  if (logoLines.length === 0) return
+  const w = termW()
+  if (w >= 63) {
+    for (const l of logoLines) {
+      console.log(center(dim(l)))
+    }
+  } else {
+    console.log(center(bold(dim('vestprompt'))))
+  }
   console.log()
-  console.log(`  ${cyan(bold('◆'))}  ${bold('vestprompt')} ${dim('v0.1.0')}`)
+}
+
+export function showTUI() {
+  try {
+    const raw = figlet.textSync('VESTPROMPT', { font: 'Standard' })
+    logoLines = raw.replace(/\n$/, '').split('\n')
+  } catch {
+    logoLines = []
+  }
+  inputBuffer = ''
+}
+
+export function collectInput() {
+  return new Promise((resolve) => {
+    inputBuffer = ''
+    stdout.write('\x1b[2J\x1b[H')
+    render('')
+
+    emitKeypressEvents(process.stdin)
+    process.stdin.setRawMode(true)
+
+    function cleanup() {
+      try { process.stdin.setRawMode(false) } catch {}
+      if (resizeTimer) { clearTimeout(resizeTimer); resizeTimer = null }
+      process.stdin.removeListener('keypress', onKeypress)
+      process.stdout.removeListener('resize', onResize)
+    }
+
+    function onResize() {
+      if (resizeTimer) clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => {
+        render(inputBuffer)
+        resizeTimer = null
+      }, 50)
+    }
+    process.stdout.on('resize', onResize)
+
+    function onKeypress(str, key) {
+      if (!key) return
+
+      if (key.ctrl && key.name === 'c') {
+        cleanup()
+        process.exit(0)
+      }
+
+      if (key.name === 'escape' || key.name === 'return') {
+        if (inputBuffer.trim()) {
+          cleanup()
+          resolve(inputBuffer.trim())
+        }
+        return
+      }
+
+      if (key.name === 'backspace') {
+        if (inputBuffer.length > 0) {
+          inputBuffer = inputBuffer.slice(0, -1)
+          render(inputBuffer)
+        }
+        return
+      }
+
+      if (key.name === 'delete') {
+        if (inputBuffer.length > 0) {
+          inputBuffer = inputBuffer.slice(1)
+          render(inputBuffer)
+        }
+        return
+      }
+
+      if (str && str.length === 1) {
+        inputBuffer += str
+        render(inputBuffer)
+      }
+    }
+
+    process.stdin.on('keypress', onKeypress)
+  })
+}
+
+export async function showProcessing() {
   console.log()
+  const { default: ora } = await import('ora')
+  const spinner = ora({
+    text: dim('Analyzing intent & optimizing structure...'),
+    spinner: 'dots',
+    color: 'cyan',
+  }).start()
+  return spinner
 }
 
 function stripMarkdown(text) {
   return text.replace(/\*\*/g, '')
 }
 
-export function showResult(optimized) {
-  console.log(`  ${green(bold('Optimized Prompt'))}`)
+export function displayResult(text) {
+  const w = termW()
+  const sep = dim('\u2500'.repeat(Math.min(w, 80)))
+
+  stdout.write('\x1b[2J\x1b[H')
+  renderLogo()
+
+  console.log(center(sep))
   console.log()
-  const lines = optimized.split('\n')
-  for (const line of lines) {
-    console.log(`  ${stripMarkdown(line)}`)
+  console.log(center(green(bold('\u2728 OPTIMIZED PROMPT READY TO COPY:'))))
+  console.log()
+
+  const cleaned = stripMarkdown(text)
+  for (const line of cleaned.split('\n')) {
+    console.log('  ' + line)
   }
+
+  console.log()
+  console.log(center(sep))
   console.log()
 }
 
-export function showError(title, message, stack) {
+export function displayError(title, message, stack) {
+  const w = termW()
+  const sep = dim('\u2500'.repeat(Math.min(w, 80)))
+
+  stdout.write('\x1b[2J\x1b[H')
+  renderLogo()
+
+  console.log(center(sep))
   console.log()
-  console.log(`  ${red(bold(title))}`)
+  console.log(center(red(bold('\u2716 ' + title))))
   console.log()
+
   for (const line of message.split('\n')) {
-    console.log(`  ${red(line)}`)
+    console.log('  ' + line)
   }
+
   if (stack) {
     console.log()
-    const stackLines = stack.split('\n').slice(0, 6)
-    for (const line of stackLines) {
-      console.log(`  ${dim(line)}`)
+    for (const line of stack.split('\n').slice(0, 6)) {
+      console.log('  ' + line)
     }
   }
+
   console.log()
-}
-
-export function collectMultilineInput() {
-  return new Promise((resolve) => {
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    })
-
-    const lines = []
-    console.log(`  ${bold('Enter your raw prompt')}`)
-    console.log(`  ${dim('(Ctrl+D or blank line to submit)')}`)
-    console.log()
-
-    rl.on('line', (line) => {
-      if (line.trim() === '' && lines.length > 0) {
-        rl.close()
-      } else {
-        lines.push(line)
-      }
-    })
-
-    rl.on('close', () => {
-      resolve(lines.join('\n').trim())
-    })
-  })
+  console.log(center(sep))
+  console.log()
 }
