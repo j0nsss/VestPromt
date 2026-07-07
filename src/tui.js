@@ -1,102 +1,168 @@
 import pc from 'picocolors'
-import { createInterface } from 'node:readline'
+import figlet from 'figlet'
+import { emitKeypressEvents } from 'node:readline'
 
 const dim = pc.dim
 const bold = pc.bold
 const blue = pc.blue
+const { stdout } = process
 
-let linesTyped = []
-let inputY = 0
+const orange = '\x1b[38;5;173m'
+const rst = '\x1b[0m'
+const blueBg = '\x1b[48;5;33m'
+
+let inputBuffer = ''
 let boxX = 0
+let boxW = 0
+let inputRow = 0
+let inputCol = 0
+let logoLines = []
 
-function termWidth() {
-  return process.stdout.columns || 80
+function termW() {
+  return stdout.columns || 80
 }
 
-function center(text) {
-  const w = termWidth()
-  const l = Math.max(0, Math.floor((w - text.length) / 2))
-  return ' '.repeat(l) + text
+function center(s) {
+  const w = termW()
+  const l = Math.max(0, Math.floor((w - s.length) / 2))
+  return ' '.repeat(l) + s
+}
+
+function buildLayout(buffer) {
+  const w = termW()
+  boxW = Math.min(70, Math.floor(w * 0.72))
+  boxX = Math.floor((w - boxW) / 2)
+  const p = ' '.repeat(boxX)
+  const horiz = '\u2500'.repeat(boxW - 2)
+
+  const topB = p + dim('\u250c' + horiz + '\u2510')
+  const botB = p + dim('\u2514' + horiz + '\u2518')
+  const indicator = blueBg + ' ' + rst
+  const pipe = dim('\u2502')
+
+  const visible = buffer.slice(-(boxW - 4))
+  const padLen = Math.max(0, boxW - 4 - visible.length)
+  const inputLine = pipe + indicator + visible + ' '.repeat(padLen) + pipe
+  const empty = pipe + ' '.repeat(boxW - 2) + pipe
+
+  const statusT = dim('Build \u00b7 Gemini 2.5 Flash \u00b7 Free Tier ') + orange + 'high' + rst
+  const statusLine = pipe + ' '.repeat(boxW - 4 - 35) + statusT + pipe
+
+  const lines = ['']
+
+  if (logoLines.length > 0) {
+    for (const l of logoLines) {
+      lines.push(center(dim(l)))
+    }
+  } else {
+    lines.push(center(bold(blue('vestprompt'))))
+  }
+  lines.push('')
+
+  lines.push(topB)
+  lines.push(inputLine)
+  for (let i = 0; i < 2; i++) lines.push(empty)
+  lines.push(statusLine)
+  lines.push(botB)
+  lines.push('')
+
+  const shortcut =
+    dim('tab agents') + dim('   ctrl+p commands') +
+    dim('   ') + bold(blue('esc submit')) +
+    dim('   ctrl+c exit')
+  const sw = termW() - 2
+  lines.push(' '.repeat(Math.max(0, sw - 30)) + shortcut)
+  lines.push('')
+
+  const tip = orange + '\u25cf' + rst + '  ' + dim('Tip  ') +
+    'Run ' + bold('vestprompt upgrade') + ' to update to the latest version'
+  lines.push(center(tip))
+  lines.push('')
+  lines.push('')
+  lines.push(dim('~'))
+
+  inputRow = 2 + (logoLines.length > 0 ? logoLines.length : 0)
+  inputCol = boxX + 3
+
+  return lines
+}
+
+function render(buffer) {
+  const lines = buildLayout(buffer)
+  const output = lines.join('\n')
+  stdout.write('\x1b[0;0H' + output)
+
+  const curRow = inputRow + 1
+  const curCol = inputCol + buffer.slice(-(boxW - 4)).length
+  stdout.write('\x1b[' + curRow + ';' + curCol + 'H')
 }
 
 export function showTUI() {
-  console.clear()
-
-  const w = termWidth()
-  const boxW = Math.min(70, Math.floor(w * 0.72))
-  boxX = Math.floor((w - boxW) / 2)
-  const p = ' '.repeat(boxX)
-
-  console.log()
-  console.log(center(blue(bold('vestprompt'))))
-  console.log()
-
-  console.log(p + dim('\u250c' + '\u2500'.repeat(boxW - 2) + '\u2510'))
-
-  const indicator = '\x1b[48;5;33m \x1b[0m'
-  console.log(p + dim('\u2502') + indicator + ' '.repeat(boxW - 4) + dim('\u2502'))
-
-  for (let i = 0; i < 2; i++) {
-    console.log(p + dim('\u2502') + ' '.repeat(boxW - 2) + dim('\u2502'))
+  try {
+    const raw = figlet.textSync('VESTPROMPT', { font: 'Standard' })
+    logoLines = raw.split('\n')
+  } catch {
+    logoLines = []
   }
 
-  const orange = '\x1b[38;5;173m'
-  const reset = '\x1b[0m'
-  const statusLine = dim('Build ') + dim('\u00b7') + dim('  Gemini 2.5 Flash ') + dim('\u00b7') + dim('  Free Tier  ') + orange + 'high' + reset
-  const statusPad = ' '.repeat(Math.max(0, boxW - 4 - statusLine.length + 10))
-  console.log(p + dim('\u2502') + statusPad + statusLine + dim('\u2502'))
-
-  console.log(p + dim('\u2514' + '\u2500'.repeat(boxW - 2) + '\u2518'))
-
-  const shortcut = dim('tab agents') + dim('   ctrl+p commands') + dim('   ') + bold(blue('enter submit')) + dim('   ctrl+c exit')
-  const shortcutX = Math.max(0, w - shortcut.length + 10)
-  console.log()
-  console.log(' '.repeat(Math.max(0, shortcutX)) + shortcut)
-  console.log()
-
-  const tip = orange + '\u25cf' + reset + '  ' + dim('Tip  ') + 'Run ' + bold('vestprompt upgrade') + ' to update to the latest version'
-  console.log(center(tip))
-  console.log()
-
-  console.log()
-  console.log(dim('~'))
-
-  const rows = process.stdout.rows || 24
-  process.stdout.write('\x1b[' + rows + ';' + (w - 5) + 'H' + dim('0.1.0'))
-  process.stdout.write('\x1b[' + 5 + ';' + (boxX + 4) + 'H')
-
-  inputY = 5
+  inputBuffer = ''
 }
 
 export function collectInput() {
   return new Promise((resolve) => {
-    linesTyped = []
+    inputBuffer = ''
+    stdout.write('\x1b[2J')
+    render('')
 
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      terminal: true,
-    })
+    emitKeypressEvents(process.stdin)
+    process.stdin.setRawMode(true)
 
-    rl.on('SIGINT', () => {
-      rl.close()
-      process.exit(0)
-    })
+    function cleanup() {
+      try { process.stdin.setRawMode(false) } catch {}
+      process.stdin.removeListener('keypress', onKeypress)
+      process.stdout.removeListener('resize', onResize)
+    }
 
-    rl.on('line', (line) => {
-      if (line.trim() === '' && linesTyped.length > 0) {
-        rl.close()
+    function onResize() {
+      render(inputBuffer)
+    }
+    process.stdout.on('resize', onResize)
+
+    function onKeypress(str, key) {
+      if (!key) return
+
+      if (key.ctrl && key.name === 'c') {
+        cleanup()
+        process.exit(0)
+      }
+
+      if (key.name === 'escape' || key.name === 'return') {
+        if (inputBuffer.trim()) {
+          cleanup()
+          resolve(inputBuffer.trim())
+        }
         return
       }
-      linesTyped.push(line)
-    })
 
-    rl.on('close', () => {
-      resolve(linesTyped.join('\n').trim())
-    })
+      if (key.name === 'backspace') {
+        inputBuffer = inputBuffer.slice(0, -1)
+        render(inputBuffer)
+        return
+      }
 
-    const writePos = '\x1b[' + inputY + ';' + (boxX + 4) + 'H'
-    process.stdout.write(writePos)
+      if (key.name === 'delete') {
+        inputBuffer = inputBuffer.slice(1)
+        render(inputBuffer)
+        return
+      }
+
+      if (str && str.length === 1) {
+        inputBuffer += str
+        render(inputBuffer)
+      }
+    }
+
+    process.stdin.on('keypress', onKeypress)
   })
 }
 

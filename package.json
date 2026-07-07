@@ -22,6 +22,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "dotenv": "^17.4.2",
+    "figlet": "^1.11.0",
     "ora": "^9.4.1",
     "picocolors": "^1.1.1"
   }
