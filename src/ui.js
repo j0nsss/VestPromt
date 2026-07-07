@@ -24,10 +24,10 @@ function renderLogo() {
   console.log()
   if (w >= 87) {
     for (const l of logoLines) {
-      console.log(center(dim(l)))
+      console.log(center(red(l)))
     }
   } else if (logoLines.length > 0) {
-    console.log(center(bold(dim('vestprompt'))))
+    console.log(center(red(bold('vestprompt'))))
   }
   console.log()
 }
